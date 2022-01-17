@@ -1,0 +1,19 @@
+# Assume python>=3.7
+matplotlib~=3.5.1
+numpy~=1.22.0
+pandas~=1.3.5
+Pillow~=9.0.0
+tqdm~=4.62.3
+scikit-learn~=0.22
+scikit-image~=0.18.2
+spacy
+spacy-legacy
+
+# PyTorch
+# https://pypi.org/project/torchtext/
+--find-links https://download.pytorch.org/whl/torch_stable.html
+torch==1.10.1
+torchvision
+torchtext
+
+
