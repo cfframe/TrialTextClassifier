@@ -5,7 +5,7 @@ import spacy
 from spacy.language import Language
 from spacy.matcher import Matcher
 from spacy.matcher import PhraseMatcher
-from spacy.tokens import Doc, Span, Token
+from spacy.tokens import Doc, DocBin, Span, Token
 
 
 def print_header(text: str):
@@ -823,6 +823,173 @@ def ch03_16():
         print(doc.ents)
 
 
+def ch04_03():
+    print_header('4.3 Creating training data (1)')
+
+    with open("exercises/en/iphone.json", encoding="utf8") as f:
+        TEXTS = json.loads(f.read())
+
+    nlp = spacy.blank("en")
+    matcher = Matcher(nlp.vocab)
+
+    # Two tokens whose lowercase forms match "iphone" and "x"
+    pattern1 = [{'LOWER': 'iphone'}, {'LOWER': 'x'}]
+
+    # Token whose lowercase form matches "iphone" and a digit
+    pattern2 = [{'LOWER': 'iphone'}, {"IS_DIGIT": True}]
+
+    # Add patterns to the matcher and create docs with matched entities
+    matcher.add("GADGET", [pattern1, pattern2])
+    docs = []
+    for doc in nlp.pipe(TEXTS):
+        matches = matcher(doc)
+        spans = [Span(doc, start, end, label=match_id) for match_id, start, end in matches]
+        print(spans)
+        doc.ents = spans
+        docs.append(doc)
+
+
+def ch04_04():
+    print_header('4.4 Creating training data (2)')
+
+    with open("exercises/en/iphone.json", encoding="utf8") as f:
+        TEXTS = json.loads(f.read())
+
+    nlp = spacy.blank("en")
+    matcher = Matcher(nlp.vocab)
+    # Add patterns to the matcher
+    pattern1 = ([{"LOWER": "iphone"}, {"LOWER": "x"}])
+    pattern2 = [{"LOWER": "iphone"}, {"IS_DIGIT": True}]
+    matcher.add("GADGET", [pattern1, pattern2])
+    docs = []
+    for doc in nlp.pipe(TEXTS):
+        matches = matcher(doc)
+        spans = [Span(doc, start, end, label=match_id) for match_id, start, end in matches]
+        doc.ents = spans
+        docs.append(doc)
+
+    doc_bin = DocBin(docs=docs)
+    doc_bin.to_disk('train.spacy')
+
+
+def ch04_07():
+    print_header('4.7 Generating a config file')
+    print('\nPart 1\n')
+
+    # ner is for 'named entity recognizer'
+    print('Command: python -m spacy init config config.cfg --lang en --pipeline ner')
+
+    # Result:
+    # python -m spacy train config.cfg --paths.train ./train.spacy --paths.dev ./dev.spacy
+
+    print('\nPart 2\n')
+    print('View with command: !cat ./config.cfg')
+
+
+def ch04_08():
+    print_header('4.8 Using the training CLI')
+    # --paths.train and --paths.dev override equivalent items in config.cfg
+    print('Command: !python -m spacy train exercises/en/config_gadget.cfg --output output --paths.train exercises/en/train_gadget.spacy --paths.dev exercises/en/dev_gadget.spacy')
+
+
+def ch04_11():
+
+    print_header('4.11 Good data vs bad data')
+
+    nlp = spacy.blank("en")
+
+    # Original
+    doc1 = nlp("i went to amsterdem last year and the canals were beautiful")
+    doc1.ents = [Span(doc1, 3, 4, label="TOURIST_DESTINATION")]
+
+    doc2 = nlp("You should visit Paris once, but the Eiffel Tower is kinda boring")
+    doc2.ents = [Span(doc2, 3, 4, label="TOURIST_DESTINATION")]
+
+    doc3 = nlp("There's also a Paris in Arkansas, lol")
+    doc3.ents = []
+
+    doc4 = nlp("Berlin is perfect for summer holiday: great nightlife and cheap beer!")
+    doc4.ents = [Span(doc4, 0, 1, label="TOURIST_DESTINATION")]
+
+    print('\nPart 1\n')
+    print('Q. Why is this data and label scheme problematic?')
+    print('Ans option. Whether a place is a tourist destination is a subjective judgement and not a definitive category.'
+          ' It will be very difficult for the entity recognizer to learn.')
+    print('Extended ans. A much better approach would be to only label "GPE" (geopolitical entity) or "LOCATION" and '
+          'then use a rule-based system to determine whether the entity is a tourist destination in this context. For '
+          'example, you could resolve the entities types back to a knowledge base or look them up in a travel wiki.')
+
+    print('\nPart 2\n')
+    nlp = spacy.blank("en")
+
+    doc1 = nlp("i went to amsterdem last year and the canals were beautiful")
+    doc1.ents = [Span(doc1, 3, 4, label="GPE")]
+
+    doc2 = nlp("You should visit Paris once, but the Eiffel Tower is kinda boring")
+    doc2.ents = [Span(doc2, 3, 4, label="GPE")]
+
+    doc3 = nlp("There's also a Paris in Arkansas, lol")
+    doc3.ents = [Span(doc3, 4, 5, label="GPE"), Span(doc3, 6, 7, label="GPE")]
+
+    doc4 = nlp("Berlin is perfect for summer holiday: great nightlife and cheap beer!")
+    doc4.ents = [Span(doc4, 0, 1, label="GPE")]
+    print(doc1.ents)
+    print(doc2.ents)
+    print(doc3.ents)
+    print(doc4.ents)
+
+
+def ch04_12():
+
+    print_header('4.12 Training multiple labels')
+
+    print('\nPart 1\n')
+
+    nlp = spacy.blank("en")
+
+    doc1 = nlp("Reddit partners with Patreon to help creators build communities")
+    doc1.ents = [
+        Span(doc1, 0, 1, label="WEBSITE"),
+        Span(doc1, 3, 4, label="WEBSITE"),
+    ]
+
+    doc2 = nlp("PewDiePie smashes YouTube record")
+    doc2.ents = [Span(doc2, 2, 3, label="WEBSITE")]
+
+    doc3 = nlp("Reddit founder Alexis Ohanian gave away two Metallica tickets to fans")
+    doc3.ents = [Span(doc3, 0, 1, label="WEBSITE")]
+
+    # And so on...
+
+    print('\nPart 2\n')
+    print('Q. A model was trained with the data you just labelled, plus a few thousand similar examples. After '
+          'training, it’s doing great on "WEBSITE", but doesn’t recognize "PERSON" anymore. Why could this be '
+          'happening?')
+    print('Ans option. The training data included no examples of "PERSON", so the model learned that this label is '
+          'incorrect.')
+    print('Ans extended. If "PERSON" entities occur in the training data but aren’t labelled, the model will learn '
+          'that they shouldn’t be predicted. Similarly, if an existing entity type isn’t present in the training data, '
+          'the model may ”forget” and stop predicting it.')
+
+    print('\nPart 3\n')
+
+    nlp = spacy.blank("en")
+
+    doc1 = nlp("Reddit partners with Patreon to help creators build communities")
+    doc1.ents = [
+        Span(doc1, 0, 1, label="WEBSITE"),
+        Span(doc1, 3, 4, label="WEBSITE"),
+    ]
+
+    doc2 = nlp("PewDiePie smashes YouTube record")
+    doc2.ents = [Span(doc2, 0, 1, label="PERSON"), Span(doc2, 2, 3, label="WEBSITE")]
+
+    doc3 = nlp("Reddit founder Alexis Ohanian gave away two Metallica tickets to fans")
+    doc3.ents = [Span(doc3, 0, 1, label="WEBSITE"), Span(doc3, 2, 4, label="PERSON")]
+
+    # And so on...
+
+
 def test_read_file():
     with open("exercises/en/tweets.json", encoding="utf8", mode='r') as f:
         COUNTRIES = f.read()
@@ -831,4 +998,4 @@ def test_read_file():
 
 if __name__ == '__main__':
     #test_read_file()
-    ch03_16()
+    ch04_11()
