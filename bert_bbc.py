@@ -8,7 +8,7 @@ from torch.optim import Adam
 from tqdm import tqdm
 from transformers import BertTokenizer
 
-from src.bert_dataset import Dataset
+from src.bert_bbc_dataset import Dataset
 from src.bert_model import BertClassifier
 
 

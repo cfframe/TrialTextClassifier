@@ -3,7 +3,7 @@ import numpy as np
 from transformers import BertTokenizer
 
 tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
-# Define labels - a dictionary that maps the category in the dataframe into the id representation of our label
+# Define labels - a dictionary that maps the category in the dataframe into the id representation of the label
 labels = {'business': 0,
           'entertainment': 1,
           'sport': 2,
