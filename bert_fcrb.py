@@ -8,12 +8,11 @@ from torch.optim import Adam
 from tqdm import tqdm
 from transformers import BertTokenizer
 
-from src.bert_bbc_dataset import Dataset
+from src.bert_serums_dataset import Dataset
 from src.bert_model import BertClassifier
 
 
 def train(model, train_data, val_data, learning_rate, epochs):
-    # Dataset is around 416MB - first use, will download this
     train, val = Dataset(train_data), Dataset(val_data)
 
     train_dataloader = torch.utils.data.DataLoader(train, batch_size=5, shuffle=True)
@@ -28,6 +27,8 @@ def train(model, train_data, val_data, learning_rate, epochs):
     if use_cuda:
         model = model.cuda()
         criterion = criterion.cuda()
+
+    results = []
 
     for epoch_num in range(epochs):
 
@@ -50,12 +51,7 @@ def train(model, train_data, val_data, learning_rate, epochs):
             acc = (output.argmax(dim=1) == train_label).sum().item()
             total_acc_train += acc
 
-            # ORIGINAL
             model.zero_grad()
-            # ALTERNATIVE (from)
-            # for param in model.parameters():
-            #     param.grad = None
-
             batch_loss.backward()
             optimizer.step()
 
@@ -80,11 +76,18 @@ def train(model, train_data, val_data, learning_rate, epochs):
                 acc = (output.argmax(dim=1) == val_label).sum().item()
                 total_acc_val += acc
 
+        results.append([epoch_num + 1,
+                        total_loss_train / len(train_data), total_acc_train / len(train_data),
+                        total_loss_val / len(val_data), total_acc_val / len(val_data)])
         print(
             f'\nEpochs: {epoch_num + 1} | Train Loss: {total_loss_train / len(train_data): .3f} \
                 | Train Accuracy: {total_acc_train / len(train_data): .3f} \
                 | Val Loss: {total_loss_val / len(val_data): .3f} \
                 | Val Accuracy: {total_acc_val / len(val_data): .3f}')
+
+    #results_df = pd.DataFrame(data=results, columns=['Epoch', 'Train Loss', 'Train Accuracy', 'Val Loss', 'Val Accuracy'])
+
+    #return results_df
 
 
 def evaluate(model, test_data):
@@ -116,7 +119,7 @@ def evaluate(model, test_data):
 
 def main():
 
-    datapath = '.data/bbc-text.csv'
+    datapath = '.data/serums_fcrb.csv'
     df = pd.read_csv(datapath)
     df.head()
 
@@ -124,25 +127,6 @@ def main():
     plt.show()
 
     # Preprocessing data
-
-    # # from transformers import BertTokenizer
-    # Note:
-    # If you have datasets from different languages, you might want to use bert-base-multilingual-cased.
-    tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
-
-    example_text = 'I will watch Memento tonight'
-    bert_input = tokenizer(example_text, padding='max_length', max_length=10,
-                           truncation=True, return_tensors="pt")
-
-    print(bert_input['input_ids'])
-    print(bert_input['token_type_ids'])
-    print(bert_input['attention_mask'])
-
-    # Decode input ids
-    example_text = tokenizer.decode(bert_input.input_ids[0])
-
-    print(example_text)
-
     # Split df into training, validation, test at 80:10:10
     np.random.seed(112)
     df_train, df_val, df_test = np.split(df.sample(frac=1, random_state=42),
@@ -156,7 +140,20 @@ def main():
     model = BertClassifier()
     LR = 1e-6
 
+    # df = train(model, df_train, df_val, LR, EPOCHS)
     train(model, df_train, df_val, LR, EPOCHS)
+
+    # x = df['Epoch'].to_list()
+    # trn_acc_label = 'Train Accuracy'
+    # trn_acc = df[trn_acc_label].to_list()
+    # val_acc_label = 'Val Accuracy'
+    # val_acc = df[val_acc_label].to_list()
+    #
+    # plt.plot(x, trn_acc, label=trn_acc_label)
+    # plt.plot(x, val_acc, label=val_acc_label)
+    #
+    # plt.legend()
+    # plt.show()
 
     evaluate(model, df_test)
 
